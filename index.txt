@@ -21,7 +21,7 @@
             font-family: 'Space Grotesk', sans-serif;
         }
 
-        .piano-keyboard, .fretboard {
+        .piano-keyboard {
             scrollbar-width: thin;
             scrollbar-color: #64748b #f1f5f9;
             touch-action: pan-x;
@@ -57,7 +57,6 @@
         }
         
         .black-key {
-            position: relative;
             width: var(--black-key-w);
             height: 108px;
             background: #1e2937;
@@ -99,39 +98,6 @@
         .chord-card:hover {
             transform: translateY(-2px);
             box-shadow: 0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1);
-        }
-
-        .fret-slot {
-            transition: background 0.2s;
-        }
-
-        .fret-slot:hover {
-            background: #f8fafc;
-        }
-
-        .note-label {
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            color: white;
-            font-size: 10px;
-            font-weight: bold;
-            z-index: 20;
-        }
-
-        .selected::after {
-            content: '';
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            width: 16px;
-            height: 16px;
-            background: #3b82f6;
-            border-radius: 9999px;
-            box-shadow: 0 2px 4px rgb(0 0 0 / 0.1);
-            z-index: 10;
         }
     </style>
 </head>
@@ -177,7 +143,7 @@
                          class="title-font text-2xl font-semibold tracking-tighter text-zinc-900"></div>
                 </div>
                 <div class="flex gap-3">
-                    <button id="edit-btn" onclick="editCurrentChord()" 
+                    <button onclick="editCurrentChord()" 
                             class="px-5 py-2 text-sm font-semibold bg-white border border-zinc-200 hover:border-zinc-300 rounded-2xl text-blue-500">
                         Edit
                     </button>
@@ -195,21 +161,15 @@
             </div>
 
             <!-- Inversion -->
-            <div id="inversion-section" class="px-6 pt-4 pb-4 bg-white border-t border-zinc-100">
+            <div class="px-6 pt-4 pb-4 bg-white border-t border-zinc-100">
                 <div class="text-xs font-medium tracking-widest text-zinc-400 mb-3 px-1">INVERSION</div>
                 <div id="inversion-picker" class="flex gap-2 overflow-x-auto pb-2 snap-x"></div>
             </div>
 
-            <!-- Instrument -->
-            <div class="px-6 pt-4 pb-4 bg-white border-t border-zinc-100">
-                <div class="text-xs font-medium tracking-widest text-zinc-400 mb-3 px-1">INSTRUMENT</div>
-                <div id="info-instrument-picker" class="flex gap-2 overflow-x-auto pb-2 snap-x"></div>
-            </div>
-
-            <!-- Instrument Container -->
+            <!-- Keyboard -->
             <div class="flex-1 bg-zinc-50 px-4 pt-6 pb-6">
-                <div class="text-xs font-medium tracking-widest text-zinc-400 mb-3 px-1">CHORD MAKER</div>
-                <div id="info-instrument-container" class="piano-keyboard"></div>
+                <div class="text-xs font-medium tracking-widest text-zinc-400 mb-3 px-1">KEYBOARD</div>
+                <div id="info-keyboard-container" class="piano-keyboard"></div>
             </div>
         </div>
 
@@ -245,20 +205,14 @@
                     <div class="text-[10px] text-zinc-400 mt-2 px-1">Example: maj7, m7, dim, 7, sus4...</div>
                 </div>
 
-                <!-- Instrument Picker -->
-                <div class="px-6 mt-6">
-                    <div class="text-xs font-medium tracking-widest text-zinc-400 mb-3">INSTRUMENT</div>
-                    <div id="new-instrument-picker" class="flex gap-2 overflow-x-auto pb-2 snap-x"></div>
-                </div>
-
-                <!-- Keyboard/Fretboard section -->
+                <!-- Keyboard section -->
                 <div class="px-6 mt-9 pb-8">
                     <div class="flex items-baseline justify-between mb-3 px-1">
                         <div class="text-xs font-medium tracking-widest text-zinc-400">CHORD MAKER</div>
                         <div id="selected-count" 
                              class="text-xs bg-blue-100 text-blue-600 px-3 py-1 rounded-3xl font-mono">0 notes</div>
                     </div>
-                    <div id="new-instrument-container" class="piano-keyboard"></div>
+                    <div id="new-keyboard-container" class="piano-keyboard"></div>
                 </div>
             </div>
 
@@ -277,52 +231,22 @@
         // Note names
         const noteNamesAll = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
 
-        // Instrument data
-        const instrumentList = ["Piano", "Guitar", "Ukulele", "Charango"];
-        const instrumentData = {
-            Piano: {
-                type: "keyboard"
-            },
-            Guitar: {
-                type: "fretboard",
-                openMidis: [40, 45, 50, 55, 59, 64], // E2 A2 D3 G3 B3 E4
-                stringLabels: ["E", "A", "D", "G", "B", "E"],
-                maxFrets: 24,
-                fretMarkers: [3, 5, 7, 9, 12, 15, 17]
-            },
-            Ukulele: {
-                type: "fretboard",
-                openMidis: [67, 60, 64, 69], // G4 C4 E4 A4
-                stringLabels: ["G", "C", "E", "A"],
-                maxFrets: 20,
-                fretMarkers: [3, 5, 7, 9, 12, 15, 17]
-            },
-            Charango: {
-                type: "fretboard",
-                openMidis: [67, 72, 76, 69, 76], // G4 C5 E5 A4 E5
-                stringLabels: ["G", "C", "E", "A", "E"],
-                maxFrets: 18,
-                fretMarkers: [3, 5, 7, 9, 12, 15, 17]
-            }
-        };
-
         // Data
         let chords = [];
         let currentChordId = null;
         let editingChordId = null;
-        let infoCurrentInversion = 0;
-        let infoCurrentInstrument = "Piano";
+        let infoCurrentInversion = 0;   // ← NEW: tracks temporary inversion in info view only
+
+        // Current new chord state
         let currentRoot = "C";
         let currentSuffix = "";
         let selectedMidis = new Set();
-        let selectedFrets = [];
-        let currentInstrument = "Piano";
 
         // Helpers
-        function midiToNoteName(midi, withOctave = false) {
+        function midiToNoteName(midi) {
             const octave = Math.floor(midi / 12) - 1;
             const noteIndex = midi % 12;
-            return noteNamesAll[noteIndex] + (withOctave ? octave : '');
+            return noteNamesAll[noteIndex] + octave;
         }
 
         function noteNameToMidi(noteName) {
@@ -356,13 +280,13 @@
             return keys;
         }
 
-        // Render keyboard
+        // Render piano keyboard
         function renderKeyboard(containerId, selectedSet, interactive = false, toggleCallback = null) {
             const container = document.getElementById(containerId);
             container.innerHTML = '';
             
             const wrapper = document.createElement('div');
-            wrapper.className = 'piano-keyboard flex bg-white border border-zinc-200 rounded-3xl p-4 shadow-inner min-w-max snap-x';
+            wrapper.className = 'piano-keyboard flex overflow-x-auto bg-white border border-zinc-200 rounded-3xl p-4 shadow-inner gap-0 min-w-max snap-x';
             
             const allKeys = generateAllKeys();
             
@@ -370,19 +294,15 @@
                 const keyEl = document.createElement('div');
                 
                 if (key.isBlack) {
-                    keyEl.className = `black-key`;
+                    keyEl.className = `black-key flex-shrink-0 flex flex-col items-center justify-end text-[9px] font-medium text-white`;
                 } else {
-                    keyEl.className = `white-key`;
+                    keyEl.className = `white-key flex-shrink-0 flex flex-col items-center justify-end`;
                 }
                 
                 keyEl.dataset.midi = key.midi;
                 
                 if (selectedSet.has(key.midi)) {
                     keyEl.classList.add('selected');
-                    const label = document.createElement('div');
-                    label.className = 'note-label';
-                    label.textContent = noteNamesAll[key.midi % 12];
-                    keyEl.appendChild(label);
                 }
                 
                 if (!key.isBlack && key.noteName === "C") {
@@ -394,7 +314,9 @@
                 
                 if (interactive) {
                     keyEl.style.cursor = 'pointer';
-                    keyEl.addEventListener('click', () => toggleCallback(key.midi));
+                    keyEl.addEventListener('click', () => {
+                        if (toggleCallback) toggleCallback(key.midi);
+                    });
                 }
                 
                 wrapper.appendChild(keyEl);
@@ -404,105 +326,33 @@
             return wrapper;
         }
 
-        // Render fretboard
-        function renderFretboard(containerId, selectedFrets, interactive = false, toggleCallback = null, instData) {
+        // Auto-scroll to center the currently displayed notes
+        function autoScrollKeyboard(containerId, midiArray) {
             const container = document.getElementById(containerId);
-            container.innerHTML = '';
-            
-            const wrapper = document.createElement('div');
-            wrapper.className = 'fretboard flex bg-white border border-zinc-200 rounded-3xl p-4 shadow-inner min-w-max snap-x';
-            
-            // Tuning column
-            const tuningCol = document.createElement('div');
-            tuningCol.className = 'flex flex-col h-[168px] pr-4 justify-between';
-            instData.stringLabels.forEach(label => {
-                const labelEl = document.createElement('div');
-                labelEl.className = 'flex-1 flex items-center justify-end text-xs font-medium text-zinc-500';
-                labelEl.textContent = label;
-                tuningCol.appendChild(labelEl);
-            });
-            wrapper.appendChild(tuningCol);
-            
-            // Fret positions (1 to maxFrets)
-            for (let fret = 1; fret <= instData.maxFrets; fret++) {
-                const fretCol = document.createElement('div');
-                fretCol.className = `flex flex-col h-[168px] min-w-[var(--white-key-w)] relative border-l ${fret === 1 ? 'border-l-2 border-zinc-400' : 'border-zinc-200'}`;
-                
-                // String slots
-                instData.openMidis.forEach((openMidi, s) => {
-                    const slot = document.createElement('div');
-                    slot.className = 'fret-slot flex-1 relative flex items-center justify-center border-b border-zinc-200 last:border-b-0';
-                    const midi = openMidi + fret;
-                    slot.dataset.midi = midi;
-                    slot.dataset.string = s;
-                    slot.dataset.fret = fret;
-                    
-                    if (selectedFrets[s] === fret) {
-                        slot.classList.add('selected');
-                        const label = document.createElement('div');
-                        label.className = 'note-label';
-                        label.textContent = noteNamesAll[midi % 12];
-                        slot.appendChild(label);
-                    }
-                    
-                    if (interactive) {
-                        slot.style.cursor = 'pointer';
-                        slot.addEventListener('click', () => toggleCallback(s, fret));
-                    }
-                    
-                    fretCol.appendChild(slot);
-                });
-                
-                // Fret marker
-                if (instData.fretMarkers.includes(fret)) {
-                    const marker = document.createElement('div');
-                    marker.className = 'absolute bottom-[-20px] left-0 right-0 text-center text-xs text-zinc-400';
-                    marker.textContent = fret;
-                    fretCol.appendChild(marker);
-                }
-                
-                wrapper.appendChild(fretCol);
-            }
-            
-            container.appendChild(wrapper);
-            return wrapper;
-        }
-
-        // Auto-scroll
-        function autoScrollInstrument(containerId, midiArray) {
-            const container = document.getElementById(containerId);
-            const wrapper = container.firstChild;
+            const wrapper = container.querySelector('.piano-keyboard');
             if (!wrapper || midiArray.length === 0) return;
 
-            let minX = Infinity;
-            let maxX = -Infinity;
+            const keys = Array.from(wrapper.children);
+            let minOffset = Infinity;
+            let maxOffset = -Infinity;
+
             midiArray.forEach(midi => {
-                const el = wrapper.querySelector(`[data-midi="${midi}"]`);
-                if (!el) return;
-
-                const rect = el.getBoundingClientRect();
-                const wrapperRect = wrapper.getBoundingClientRect();
-                const left = rect.left - wrapperRect.left + wrapper.scrollLeft;
-                const right = rect.right - wrapperRect.left + wrapper.scrollLeft;
-
-                minX = Math.min(minX, left);
-                maxX = Math.max(maxX, right);
+                const keyEl = keys.find(k => parseInt(k.dataset.midi) === midi);
+                if (keyEl) {
+                    const offset = keyEl.offsetLeft;
+                    minOffset = Math.min(minOffset, offset);
+                    maxOffset = Math.max(maxOffset, offset + keyEl.offsetWidth);
+                }
             });
 
-            if (minX === Infinity) return;
+            const chordCenter = (minOffset + maxOffset) / 2;
+            const viewportWidth = wrapper.clientWidth;
+            const scrollTo = Math.max(0, Math.round(chordCenter - viewportWidth / 2));
 
-            // Scroll so the chord is visible and centered if possible
-            const margin = 24;
-            const targetLeft = Math.max(0, minX - margin);
-            const targetRight = Math.min(wrapper.scrollWidth, maxX + margin);
-            const targetCenter = (targetLeft + targetRight) / 2;
-            const viewport = container.clientWidth;
-            const scrollTo = Math.max(0, targetCenter - viewport / 2);
-
-            container.scrollTo({ left: scrollTo, behavior: 'smooth' });
+            wrapper.scrollTo({ left: scrollTo, behavior: 'smooth' });
         }
 
-        // Render note picker
+        // Horizontal scrollable picker (Root Note & Transpose)
         function renderNotePicker(containerId, activeNote, onClick) {
             const container = document.getElementById(containerId);
             container.innerHTML = '';
@@ -526,30 +376,7 @@
             container.appendChild(wrapper);
         }
 
-        // Render instrument picker
-        function renderInstrumentPicker(containerId, activeInstrument, onClick) {
-            const container = document.getElementById(containerId);
-            container.innerHTML = '';
-            
-            const wrapper = document.createElement('div');
-            wrapper.className = 'flex gap-2 overflow-x-auto pb-2 snap-x';
-            
-            instrumentList.forEach(inst => {
-                const btn = document.createElement('button');
-                btn.textContent = inst;
-                btn.className = `flex-shrink-0 px-7 py-3 text-sm font-semibold rounded-3xl transition-all snap-start ${
-                    inst === activeInstrument 
-                        ? 'bg-blue-500 text-white shadow-md' 
-                        : 'bg-white border border-zinc-200 hover:bg-zinc-50 text-zinc-700'
-                }`;
-                btn.onclick = () => onClick(inst);
-                wrapper.appendChild(btn);
-            });
-            
-            container.appendChild(wrapper);
-        }
-
-        // Get inverted notes
+        // Inversion – now temporary only (original notes never change)
         function getInvertedNotes(originalNotes, level) {
             if (!originalNotes || originalNotes.length === 0) return [];
             let sorted = [...originalNotes].sort((a, b) => a - b);
@@ -562,12 +389,12 @@
             return result;
         }
 
-        // Render inversion picker
-        function renderInversionPicker(containerId, numNotes, currentLevel) {
+        function renderInversionPicker(containerId, chord, currentLevel) {
             const container = document.getElementById(containerId);
             container.innerHTML = '';
             
-            if (numNotes < 2) {
+            const num = chord.notes.length;
+            if (num < 2) {
                 const empty = document.createElement('div');
                 empty.className = 'text-zinc-400 text-sm px-2 py-3 italic';
                 empty.textContent = 'Single note – no inversions available';
@@ -575,8 +402,11 @@
                 return;
             }
             
+            const flex = document.createElement('div');
+            flex.className = 'flex gap-2 overflow-x-auto pb-2 snap-x';
+            
             const labels = ["Root position"];
-            for (let i = 1; i < numNotes; i++) {
+            for (let i = 1; i < num; i++) {
                 const suffix = i === 1 ? 'st' : i === 2 ? 'nd' : i === 3 ? 'rd' : 'th';
                 labels.push(`${i}${suffix} inversion`);
             }
@@ -589,29 +419,30 @@
                         ? 'bg-blue-500 text-white shadow-md' 
                         : 'bg-white border border-zinc-200 hover:bg-zinc-50 text-zinc-700'
                 }`;
-                btn.onclick = () => selectInversion(idx);
-                container.appendChild(btn);
+                btn.onclick = () => selectInversion(chord.id, idx);
+                flex.appendChild(btn);
             });
-        }
-
-        function selectInversion(level) {
-            infoCurrentInversion = level;
             
-            renderChordInfo(currentChordId, infoCurrentInstrument);
+            container.appendChild(flex);
         }
 
-        function getEntryMidis(entry, instData) {
-            if (entry.type === 'keyboard') {
-                return entry.data;
-            } else {
-                return entry.data.reduce((arr, f, s) => {
-                    if (f > 0) arr.push(instData.openMidis[s] + f);
-                    return arr;
-                }, []);
-            }
+        function selectInversion(id, level) {
+            infoCurrentInversion = level;
+            const chord = chords.find(c => c.id === id);
+            if (!chord) return;
+            
+            // Re-render inversion buttons (highlight active)
+            renderInversionPicker('inversion-picker', chord, infoCurrentInversion);
+            
+            // Compute temporary inverted notes for display only
+            const displayedNotes = getInvertedNotes(chord.notes, infoCurrentInversion);
+            const selectedSet = new Set(displayedNotes);
+            
+            renderKeyboard('info-keyboard-container', selectedSet, false);
+            autoScrollKeyboard('info-keyboard-container', displayedNotes);
         }
 
-        // Render chord list
+        // Render main list
         function renderChordList() {
             const container = document.getElementById('chord-list');
             container.innerHTML = '';
@@ -631,15 +462,13 @@
             }
             
             chords.forEach(chord => {
-                const pianoEntry = chord.instruments.Piano;
-                const noteCount = pianoEntry ? getEntryMidis(pianoEntry, instrumentData.Piano).length : 0;
                 const card = document.createElement('div');
                 card.className = `chord-card bg-white border border-zinc-100 rounded-3xl px-6 py-5 cursor-pointer active:scale-[0.985]`;
                 card.innerHTML = `
                     <div class="flex items-center justify-between">
                         <div>
                             <div class="title-font text-2xl font-semibold tracking-tighter text-zinc-900">${chord.fullName}</div>
-                            <div class="text-xs text-zinc-400 font-mono mt-1">${noteCount} notes</div>
+                            <div class="text-xs text-zinc-400 font-mono mt-1">${chord.notes.length} notes</div>
                         </div>
                         <div class="text-3xl text-blue-200">♫</div>
                     </div>
@@ -657,18 +486,11 @@
             const saved = localStorage.getItem('chordLibrary');
             if (saved) {
                 chords = JSON.parse(saved);
-                // Backward compatibility
-                chords.forEach(chord => {
-                    if (chord.notes) {
-                        chord.instruments = {Piano: {type: 'keyboard', data: chord.notes}};
-                        delete chord.notes;
-                    }
-                });
             } else {
                 chords = [
-                    { id: 1739000000000, root: "C", suffix: "maj7", fullName: "Cmaj7", instruments: {Piano: {type: 'keyboard', data: [60, 64, 67, 71]}} },
-                    { id: 1739000000001, root: "C", suffix: "dim", fullName: "Cdim", instruments: {Piano: {type: 'keyboard', data: [60, 63, 66]}} },
-                    { id: 1739000000002, root: "D#", suffix: "9", fullName: "D#9", instruments: {Piano: {type: 'keyboard', data: [63, 66, 70, 73, 75]}} }
+                    { id: 1739000000000, root: "C", suffix: "maj7", fullName: "Cmaj7", notes: [60, 64, 67, 71] },
+                    { id: 1739000000001, root: "C", suffix: "dim", fullName: "Cdim", notes: [60, 63, 66] },
+                    { id: 1739000000002, root: "D#", suffix: "9", fullName: "D#9", notes: [63, 66, 70, 73, 75] }
                 ];
                 saveToStorage();
             }
@@ -686,99 +508,58 @@
             renderChordList();
         }
 
-        function renderChordInfo(id, inst) {
+        function showChordInfo(id) {
+            currentChordId = id;
             const chord = chords.find(c => c.id === id);
             if (!chord) return;
             
+            hideAllViews();
+            const view = document.getElementById('chord-info-view');
+            view.classList.remove('hidden');
+            
             document.getElementById('info-chord-name').textContent = chord.fullName;
             
-            const entry = chord.instruments[inst];
-            const hasEntry = !!entry;
-            document.getElementById('edit-btn').disabled = !hasEntry;
-            
-            const container = document.getElementById('info-instrument-container');
-            container.innerHTML = '';
-            
-            if (!hasEntry) {
-                const empty = document.createElement('div');
-                empty.className = 'text-zinc-400 text-sm italic text-center py-8';
-                empty.textContent = 'No chord defined for this instrument';
-                container.appendChild(empty);
-                return;
-            }
-            
-            const instData = instrumentData[inst];
-            let midiArray = [];
-            if (entry.type === 'keyboard') {
-                const originalNotes = getEntryMidis(entry, instData);
-                const displayedNotes = getInvertedNotes(originalNotes, infoCurrentInversion);
-                const selectedSet = new Set(displayedNotes);
-                renderKeyboard('info-instrument-container', selectedSet, false);
-                midiArray = displayedNotes;
-                renderInversionPicker('inversion-picker', originalNotes.length, infoCurrentInversion);
-                document.getElementById('inversion-section').classList.remove('hidden');
-            } else {
-                const frets = entry.data;
-                renderFretboard('info-instrument-container', frets, false, null, instData);
-                midiArray = frets.reduce((arr, f, s) => {
-                    if (f > 0) arr.push(instData.openMidis[s] + f);
-                    return arr;
-                }, []);
-                document.getElementById('inversion-section').classList.add('hidden');
-            }
-            
-            setTimeout(() => {
-                autoScrollInstrument('info-instrument-container', midiArray);
-            }, 50);
-        }
-
-        function showChordInfo(id) {
-            currentChordId = id;
+            // Reset inversion when entering the view
             infoCurrentInversion = 0;
-            infoCurrentInstrument = "Piano";
-            hideAllViews();
-            document.getElementById('chord-info-view').classList.remove('hidden');
             
-            const chord = chords.find(c => c.id === id);
             renderNotePicker('transpose-picker', chord.root, (newRoot) => {
                 transposeChord(id, newRoot);
             });
             
-            renderInstrumentPicker('info-instrument-picker', infoCurrentInstrument, selectInfoInstrument);
+            renderInversionPicker('inversion-picker', chord, infoCurrentInversion);
             
-            renderChordInfo(id, infoCurrentInstrument);
+            // Display the CURRENT inversion (temporary)
+            const displayedNotes = getInvertedNotes(chord.notes, infoCurrentInversion);
+            const selectedSet = new Set(displayedNotes);
+            renderKeyboard('info-keyboard-container', selectedSet, false);
+            
+            // Auto-scroll to the visible notes
+            setTimeout(() => {
+                autoScrollKeyboard('info-keyboard-container', displayedNotes);
+            }, 50);
         }
 
         function transposeChord(id, newRoot) {
-            const chord = chords.find(c => c.id === id);
-            if (!chord) return;
+            const chordIndex = chords.findIndex(c => c.id === id);
+            if (chordIndex === -1) return;
             
-            const inst = infoCurrentInstrument;
-            const entry = chord.instruments[inst];
-            if (!entry) return;
-            
+            const chord = chords[chordIndex];
             const oldRootMidi = getRootMidi(chord.root);
             const newRootMidi = getRootMidi(newRoot);
             const delta = newRootMidi - oldRootMidi;
             
-            if (entry.type === 'keyboard') {
-                entry.data = entry.data.map(m => Math.max(21, Math.min(108, m + delta)));
-            } else {
-                entry.data = entry.data.map(f => f > 0 ? Math.max(1, f + delta) : f);
-            }
+            // Transpose the ORIGINAL root-position notes
+            const newNotes = chord.notes.map(midi => {
+                let newMidi = midi + delta;
+                return Math.max(21, Math.min(108, newMidi));
+            });
             
             chord.root = newRoot;
             chord.fullName = newRoot + chord.suffix;
+            chord.notes = newNotes;
             
             saveToStorage();
-            showChordInfo(id);
-        }
-
-        function selectInfoInstrument(inst) {
-            infoCurrentInstrument = inst;
-            infoCurrentInversion = 0;
-            renderInstrumentPicker('info-instrument-picker', infoCurrentInstrument, selectInfoInstrument);
-            renderChordInfo(currentChordId, infoCurrentInstrument);
+            showChordInfo(id); // this resets inversion to root position
         }
 
         function editCurrentChord() {
@@ -788,7 +569,7 @@
             editingChordId = currentChordId;
             currentRoot = chord.root;
             currentSuffix = chord.suffix;
-            currentInstrument = infoCurrentInstrument;
+            selectedMidis = new Set(chord.notes);
             
             document.getElementById('chord-suffix-input').value = currentSuffix;
             
@@ -801,19 +582,7 @@
                 updateSelectedCount();
             });
             
-            renderInstrumentPicker('new-instrument-picker', currentInstrument, selectNewInstrument);
-            
-            const entry = chord.instruments[currentInstrument];
-            const instType = instrumentData[currentInstrument].type;
-            if (instType === 'keyboard') {
-                selectedMidis = new Set(entry ? entry.data : []);
-                selectedFrets = [];
-            } else {
-                selectedFrets = entry ? [...entry.data] : new Array(instrumentData[currentInstrument].openMidis.length).fill(-1);
-                selectedMidis = new Set();
-            }
-            
-            renderInstrumentContainer('new-instrument-container', currentInstrument, true);
+            renderKeyboard('new-keyboard-container', selectedMidis, true, handleNoteToggle);
             updateSelectedCount();
         }
 
@@ -828,85 +597,39 @@
             editingChordId = null;
             currentRoot = "C";
             currentSuffix = "";
-            currentInstrument = "Piano";
             selectedMidis = new Set();
-            selectedFrets = [];
             document.getElementById('chord-suffix-input').value = "";
             
             hideAllViews();
-            document.getElementById('new-chord-view').classList.remove('hidden');
+            const view = document.getElementById('new-chord-view');
+            view.classList.remove('hidden');
             
             renderNotePicker('root-picker', currentRoot, (note) => {
                 currentRoot = note;
                 renderNotePicker('root-picker', currentRoot, arguments.callee);
             });
             
-            renderInstrumentPicker('new-instrument-picker', currentInstrument, selectNewInstrument);
-            
-            renderInstrumentContainer('new-instrument-container', currentInstrument, true);
+            renderKeyboard('new-keyboard-container', selectedMidis, true, handleNoteToggle);
             updateSelectedCount();
         }
 
-        function selectNewInstrument(inst) {
-            currentInstrument = inst;
-            const instType = instrumentData[inst].type;
-            if (instType === 'keyboard') {
-                selectedMidis = new Set();
-                selectedFrets = [];
+        function handleNoteToggle(midi) {
+            if (selectedMidis.has(midi)) {
+                selectedMidis.delete(midi);
             } else {
-                selectedFrets = new Array(instrumentData[inst].openMidis.length).fill(-1);
-                selectedMidis = new Set();
+                selectedMidis.add(midi);
             }
-            renderInstrumentPicker('new-instrument-picker', currentInstrument, selectNewInstrument);
-            renderInstrumentContainer('new-instrument-container', currentInstrument, true);
-            updateSelectedCount();
-        }
-
-        function renderInstrumentContainer(containerId, instrumentName, interactive) {
-            const instData = instrumentData[instrumentName];
-            const instType = instData.type;
-            if (instType === 'keyboard') {
-                renderKeyboard(containerId, selectedMidis, interactive, handleNoteToggle);
-            } else {
-                renderFretboard(containerId, selectedFrets, interactive, handleNoteToggle, instData);
-            }
-        }
-
-        function handleNoteToggle(...args) {
-            const instType = instrumentData[currentInstrument].type;
-            if (instType === 'keyboard') {
-                const midi = args[0];
-                if (selectedMidis.has(midi)) {
-                    selectedMidis.delete(midi);
-                } else {
-                    selectedMidis.add(midi);
-                }
-            } else {
-                const [s, f] = args;
-                if (selectedFrets[s] === f) {
-                    selectedFrets[s] = -1;
-                } else {
-                    selectedFrets[s] = f;
-                }
-            }
-            renderInstrumentContainer('new-instrument-container', currentInstrument, true);
+            renderKeyboard('new-keyboard-container', selectedMidis, true, handleNoteToggle);
             updateSelectedCount();
         }
 
         function updateSelectedCount() {
-            let count = 0;
-            const instType = instrumentData[currentInstrument].type;
-            if (instType === 'keyboard') {
-                count = selectedMidis.size;
-            } else {
-                count = selectedFrets.reduce((c, f) => c + (f > 0 ? 1 : 0), 0);
-            }
             const countEl = document.getElementById('selected-count');
-            countEl.textContent = `${count} note${count === 1 ? '' : 's'}`;
+            countEl.textContent = `${selectedMidis.size} note${selectedMidis.size === 1 ? '' : 's'}`;
             
             const saveBtn = document.getElementById('save-btn');
             const suffix = document.getElementById('chord-suffix-input').value.trim();
-            saveBtn.disabled = count === 0 || !suffix;
+            saveBtn.disabled = selectedMidis.size === 0 || !suffix;
         }
 
         function saveChord() {
@@ -917,14 +640,12 @@
                 alert("Please enter a chord suffix (e.g. maj7)");
                 return;
             }
-            if (updateSelectedCount(), document.getElementById('save-btn').disabled) {
-                alert("Please select at least one note");
+            if (selectedMidis.size === 0) {
+                alert("Please select at least one note on the keyboard");
                 return;
             }
             
             const fullName = currentRoot + suffix;
-            const instType = instrumentData[currentInstrument].type;
-            const data = instType === 'keyboard' ? Array.from(selectedMidis).sort((a, b) => a - b) : [...selectedFrets];
             
             if (editingChordId !== null) {
                 const chord = chords.find(c => c.id === editingChordId);
@@ -932,7 +653,7 @@
                     chord.root = currentRoot;
                     chord.suffix = suffix;
                     chord.fullName = fullName;
-                    chord.instruments[currentInstrument] = {type: instType, data};
+                    chord.notes = Array.from(selectedMidis); // always saved as root position
                 }
             } else {
                 const newChord = {
@@ -940,7 +661,7 @@
                     root: currentRoot,
                     suffix: suffix,
                     fullName: fullName,
-                    instruments: {[currentInstrument]: {type: instType, data}}
+                    notes: Array.from(selectedMidis)
                 };
                 chords.unshift(newChord);
             }
@@ -965,6 +686,7 @@
             loadFromStorage();
             showMainView();
             setupInputListeners();
+            console.log('%c✅ Chord Library updated! Inversion is now temporary only ✓ Root position always restored on exit ✓ Active inversion button is highlighted blue ✓', 'color:#3b82f6; font-family:monospace');
         }
 
         window.onload = initializeApp;
