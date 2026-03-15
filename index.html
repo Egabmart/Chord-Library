@@ -264,11 +264,31 @@
 
             <!-- Save Button -->
             <div class="p-6 bg-white border-t border-zinc-100">
-                <button onclick="saveChord()"
+                <button onclick="saveChord(false)"
                         id="save-btn"
                         class="w-full bg-blue-500 hover:bg-blue-600 transition-all disabled:bg-zinc-200 disabled:text-zinc-400 text-white font-semibold text-lg py-5 rounded-3xl shadow-xl shadow-blue-500/40">
                     SAVE CHORD
                 </button>
+
+                <button id="save-folder-btn"
+                        onclick="handleSaveFolderClick()"
+                        class="w-full mt-3 bg-white border border-zinc-200 hover:border-zinc-300 text-zinc-700 font-semibold text-lg py-4 rounded-3xl">
+                    SAVE IN FOLDER
+                </button>
+
+                <div id="folder-controls" class="mt-4 hidden">
+                    <label class="text-xs font-medium tracking-widest text-zinc-400 mb-2 block">Folder</label>
+                    <div class="flex gap-2">
+                        <select id="folder-select" class="flex-1 bg-white border border-zinc-200 rounded-3xl px-4 py-3 text-sm text-zinc-700">
+                            <!-- populated by JS -->
+                        </select>
+                        <button id="create-folder-btn" onclick="handleCreateFolder()" 
+                                class="px-4 py-3 bg-blue-500 hover:bg-blue-600 text-white rounded-3xl text-sm font-semibold">
+                            +
+                        </button>
+                    </div>
+                    <p class="text-xs text-zinc-400 mt-2">Select a folder to save in, or create a new one.</p>
+                </div>
             </div>
         </div>
     </div>
@@ -308,6 +328,8 @@
 
         // Data
         let chords = [];
+        let folders = [];
+        let folderExpandedStates = {};
         let currentChordId = null;
         let editingChordId = null;
         let infoCurrentInversion = 0;
@@ -317,6 +339,10 @@
         let selectedMidis = new Set();
         let selectedFrets = [];
         let currentInstrument = "Piano";
+
+        // Folder mode (new/edit chord)
+        let saveInFolderMode = false;
+        let selectedFolderId = null;
 
         // Helpers
         function midiToNoteName(midi, withOctave = false) {
@@ -615,7 +641,7 @@
         function renderChordList() {
             const container = document.getElementById('chord-list');
             container.innerHTML = '';
-            
+
             if (chords.length === 0) {
                 const empty = document.createElement('div');
                 empty.className = 'flex flex-col items-center justify-center h-96 text-center px-8';
@@ -629,34 +655,106 @@
                 container.appendChild(empty);
                 return;
             }
-            
-            chords.forEach(chord => {
-                const pianoEntry = chord.instruments.Piano;
-                const noteCount = pianoEntry ? getEntryMidis(pianoEntry, instrumentData.Piano).length : 0;
-                const card = document.createElement('div');
-                card.className = `chord-card bg-white border border-zinc-100 rounded-3xl px-6 py-5 cursor-pointer active:scale-[0.985]`;
-                card.innerHTML = `
-                    <div class="flex items-center justify-between">
-                        <div>
-                            <div class="title-font text-2xl font-semibold tracking-tighter text-zinc-900">${chord.fullName}</div>
-                            <div class="text-xs text-zinc-400 font-mono mt-1">${noteCount} notes</div>
-                        </div>
-                        <div class="text-3xl text-blue-200">♫</div>
-                    </div>
-                `;
-                card.addEventListener('click', () => showChordInfo(chord.id));
-                container.appendChild(card);
+
+            const unfiledChords = chords.filter(c => !c.folderId || !folders.some(f => f.id === c.folderId));
+            const folderChords = (folderId) => chords.filter(c => c.folderId === folderId);
+
+            if (unfiledChords.length > 0) {
+                container.appendChild(renderChordSection('All Chords', unfiledChords, false));
+            }
+
+            folders.forEach(folder => {
+                const chordsInFolder = folderChords(folder.id);
+                container.appendChild(renderChordSection(folder.name, chordsInFolder, true, folder.id));
             });
         }
 
+        function renderChordSection(title, chordList, isFolder, folderId) {
+            const section = document.createElement('div');
+
+            const header = document.createElement('div');
+            header.className = 'flex items-center justify-between bg-white border border-zinc-100 rounded-3xl px-5 py-4 ' + (isFolder ? 'cursor-pointer' : '');
+            header.innerHTML = `
+                <div class="font-semibold text-zinc-900">${title}</div>
+                <div class="text-xs text-zinc-400 font-mono">${chordList.length} chord${chordList.length === 1 ? '' : 's'}</div>
+            `;
+
+            if (isFolder) {
+                header.addEventListener('click', () => {
+                    folderExpandedStates[folderId] = !folderExpandedStates[folderId];
+                    renderChordList();
+                });
+            }
+
+            section.appendChild(header);
+
+            const list = document.createElement('div');
+            list.className = 'mt-3 space-y-3';
+
+            const expanded = isFolder ? folderExpandedStates[folderId] !== false : true;
+            if (expanded) {
+                if (chordList.length === 0) {
+                    const empty = document.createElement('div');
+                    empty.className = 'text-zinc-400 text-sm italic px-6 py-4 bg-white border border-zinc-100 rounded-3xl';
+                    empty.textContent = isFolder ? 'No chords in this folder yet' : 'No chords added yet';
+                    list.appendChild(empty);
+                } else {
+                    chordList.forEach(chord => {
+                        list.appendChild(createChordCard(chord));
+                    });
+                }
+            }
+
+            section.appendChild(list);
+            return section;
+        }
+
+        function createChordCard(chord) {
+            const pianoEntry = chord.instruments.Piano;
+            const noteCount = pianoEntry ? getEntryMidis(pianoEntry, instrumentData.Piano).length : 0;
+            const card = document.createElement('div');
+            card.className = `chord-card bg-white border border-zinc-100 rounded-3xl px-6 py-5 cursor-pointer active:scale-[0.985]`;
+            card.innerHTML = `
+                <div class="flex items-center justify-between">
+                    <div>
+                        <div class="title-font text-2xl font-semibold tracking-tighter text-zinc-900">${chord.fullName}</div>
+                        <div class="text-xs text-zinc-400 font-mono mt-1">${noteCount} notes</div>
+                    </div>
+                    <div class="text-3xl text-blue-200">♫</div>
+                </div>
+            `;
+            card.addEventListener('click', () => showChordInfo(chord.id));
+            return card;
+        }
+
+        function makeFolderId() {
+            return `folder-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+        }
+
+        function getDefaultFolders() {
+            return [
+                { id: 'folder-chords', name: 'Chords' },
+                { id: 'folder-scales', name: 'Scales' },
+                { id: 'folder-modes', name: 'modes' }
+            ];
+        }
+
         function saveToStorage() {
-            localStorage.setItem('chordLibrary', JSON.stringify(chords));
+            localStorage.setItem('chordLibrary', JSON.stringify({ chords, folders }));
         }
 
         function loadFromStorage() {
             const saved = localStorage.getItem('chordLibrary');
             if (saved) {
-                chords = JSON.parse(saved);
+                const parsed = JSON.parse(saved);
+                if (Array.isArray(parsed)) {
+                    chords = parsed;
+                    folders = getDefaultFolders();
+                } else {
+                    chords = parsed.chords || [];
+                    folders = parsed.folders || getDefaultFolders();
+                }
+
                 // Backward compatibility
                 chords.forEach(chord => {
                     if (chord.notes) {
@@ -670,8 +768,88 @@
                     { id: 1739000000001, root: "C", suffix: "dim", fullName: "Cdim", instruments: {Piano: {type: 'keyboard', data: [60, 63, 66]}} },
                     { id: 1739000000002, root: "D#", suffix: "9", fullName: "D#9", instruments: {Piano: {type: 'keyboard', data: [63, 66, 70, 73, 75]}} }
                 ];
+                folders = getDefaultFolders();
                 saveToStorage();
             }
+
+            folders.forEach(f => {
+                if (folderExpandedStates[f.id] === undefined) {
+                    folderExpandedStates[f.id] = true;
+                }
+            });
+        }
+
+        // Folder UI and helpers
+        function handleSaveFolderClick() {
+            if (!saveInFolderMode) {
+                saveInFolderMode = true;
+                updateFolderControls();
+                return;
+            }
+
+            // If folder mode is already active, treat as the save action.
+            saveChord(true);
+        }
+
+        function updateFolderControls() {
+            const folderControls = document.getElementById('folder-controls');
+            const folderBtn = document.getElementById('save-folder-btn');
+            if (saveInFolderMode) {
+                folderControls.classList.remove('hidden');
+                folderBtn.classList.add('bg-blue-500', 'text-white');
+                folderBtn.classList.remove('bg-white', 'text-zinc-700');
+                renderFolderSelect();
+            } else {
+                folderControls.classList.add('hidden');
+                folderBtn.classList.remove('bg-blue-500', 'text-white');
+                folderBtn.classList.add('bg-white', 'text-zinc-700');
+            }
+        }
+
+        function renderFolderSelect() {
+            const select = document.getElementById('folder-select');
+            if (!select) return;
+
+            select.innerHTML = '';
+            const placeholder = document.createElement('option');
+            placeholder.value = '';
+            placeholder.textContent = 'Select a folder';
+            placeholder.disabled = true;
+            placeholder.selected = !selectedFolderId;
+            select.appendChild(placeholder);
+
+            folders.forEach(folder => {
+                const opt = document.createElement('option');
+                opt.value = folder.id;
+                opt.textContent = folder.name;
+                opt.selected = folder.id === selectedFolderId;
+                select.appendChild(opt);
+            });
+
+            const createOpt = document.createElement('option');
+            createOpt.value = '__create__';
+            createOpt.textContent = '+ Create new folder...';
+            select.appendChild(createOpt);
+
+            select.onchange = () => {
+                if (select.value === '__create__') {
+                    handleCreateFolder();
+                } else {
+                    selectedFolderId = select.value;
+                }
+            };
+        }
+
+        function handleCreateFolder() {
+            const name = prompt('New folder name');
+            if (!name) return;
+            const folder = { id: makeFolderId(), name };
+            folders.push(folder);
+            folderExpandedStates[folder.id] = true;
+            selectedFolderId = folder.id;
+            saveToStorage();
+            renderFolderSelect();
+            renderChordList();
         }
 
         function hideAllViews() {
@@ -789,6 +967,10 @@
             currentRoot = chord.root;
             currentSuffix = chord.suffix;
             currentInstrument = infoCurrentInstrument;
+
+            saveInFolderMode = Boolean(chord.folderId);
+            selectedFolderId = chord.folderId || null;
+            updateFolderControls();
             
             document.getElementById('chord-suffix-input').value = currentSuffix;
             
@@ -831,6 +1013,9 @@
             currentInstrument = "Piano";
             selectedMidis = new Set();
             selectedFrets = [];
+            saveInFolderMode = false;
+            selectedFolderId = null;
+            updateFolderControls();
             document.getElementById('chord-suffix-input').value = "";
             
             hideAllViews();
@@ -909,7 +1094,10 @@
             saveBtn.disabled = count === 0 || !suffix;
         }
 
-        function saveChord() {
+        function saveChord(saveToFolder = false) {
+            saveInFolderMode = saveToFolder;
+            updateFolderControls();
+
             const suffixInput = document.getElementById('chord-suffix-input');
             let suffix = suffixInput.value.trim();
             
@@ -921,10 +1109,16 @@
                 alert("Please select at least one note");
                 return;
             }
+
+            if (saveToFolder && !selectedFolderId) {
+                alert("Please select a folder to save the chord in.");
+                return;
+            }
             
             const fullName = currentRoot + suffix;
             const instType = instrumentData[currentInstrument].type;
             const data = instType === 'keyboard' ? Array.from(selectedMidis).sort((a, b) => a - b) : [...selectedFrets];
+            const folderId = saveToFolder ? selectedFolderId : null;
             
             if (editingChordId !== null) {
                 const chord = chords.find(c => c.id === editingChordId);
@@ -933,6 +1127,7 @@
                     chord.suffix = suffix;
                     chord.fullName = fullName;
                     chord.instruments[currentInstrument] = {type: instType, data};
+                    chord.folderId = folderId;
                 }
             } else {
                 const newChord = {
@@ -940,12 +1135,15 @@
                     root: currentRoot,
                     suffix: suffix,
                     fullName: fullName,
-                    instruments: {[currentInstrument]: {type: instType, data}}
+                    instruments: {[currentInstrument]: {type: instType, data}},
+                    folderId: folderId
                 };
                 chords.unshift(newChord);
             }
             
             saveToStorage();
+            saveInFolderMode = false;
+            updateFolderControls();
             backToMain();
         }
 
